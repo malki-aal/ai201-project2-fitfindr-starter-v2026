@@ -13,10 +13,39 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+
+# "under $30", "below 30", "less than $30.50"
+_PRICE_RE = re.compile(r"(?:under|below|less than)\s*\$?(\d+(?:\.\d+)?)", re.I)
+# "size M", "in size 8.5"
+_SIZE_RE = re.compile(r"size\s+([A-Za-z0-9/.\-]+)", re.I)
+
+
+def _parse_query(query: str) -> dict:
+    """
+    Pull a description, a size, and a max_price out of a plain-language query.
+
+    Regex, not the model — this is deterministic data the user typed in a
+    handful of predictable shapes ("under $X", "size Y"), not something that
+    benefits from a model call. Whatever is left after stripping those two
+    phrases out becomes the description.
+    """
+    price_match = _PRICE_RE.search(query)
+    max_price = float(price_match.group(1)) if price_match else None
+
+    size_match = _SIZE_RE.search(query)
+    size = size_match.group(1) if size_match else None
+
+    description = _PRICE_RE.sub("", query)
+    description = _SIZE_RE.sub("", description)
+    description = re.sub(r"\s+", " ", description).strip()
+
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -107,8 +136,36 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    count = 1
+    trace.check_iterations(count)
+
+    session["parsed"] = _parse_query(query)
+
+    session["search_results"] = search_listings(
+        description=session["parsed"]["description"],
+        size=session["parsed"]["size"],
+        max_price=session["parsed"]["max_price"],
+    )
+
+    # ⚠️ THE BRANCH: nothing found means we stop here rather than hand
+    # suggest_outfit an item that doesn't exist.
+    if not session["search_results"]:
+        session["error"] = (
+            "No listings matched. Try a broader description, a higher "
+            "max_price, or dropping the size filter."
+        )
+        return session
+
+    session["selected_item"] = session["search_results"][0]
+
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
     return session
 
 
