@@ -53,12 +53,12 @@ Given a query that matches no listings, the agent stops before calling
      look like state failure — it looks like a tool problem. Something that
      compares session["selected_item"] against what actually reached
      suggest_outfit is the shape you're after. -->
-
+Given a matching query, the `id` on `session["selected_item"]` is the same `id` the item passed into `suggest_outfit` has — 5 of 5 tries.
 
 
 **Why this target:**
 
-
+There's no model call between search and `suggest_outfit` — `selected_item` is a plain dict passed straight through `session`, with no copying or re-fetching in between. If the id didn't match, that would mean a real bug in the plumbing, not normal variance, so there's no reason to accept less than 5 of 5.
 
 ---
 
@@ -74,12 +74,12 @@ Given a query that matches no listings, the agent stops before calling
      mentions the price? Two different items producing the same opening
      sentence? A card longer than a caption anyone would post? Any of those can
      be turned into a number. -->
-
+Given the same item run through `create_fit_card` five times, the fit card mentions the item's price in at least 4 of 5 tries.
 
 
 **Why this target:**
 
-
+My prompt in `create_fit_card` explicitly asks the model to mention the price once, but `TEMPERATURE` is set to 0.9, which means the model's wording varies run to run. It's plausible the model occasionally phrases around the number — folding it into something vaguer like "a steal" — instead of stating it directly, so I'm not holding this to 5 of 5.
 
 ---
 
@@ -92,11 +92,11 @@ Given a query that matches no listings, the agent stops before calling
      search respects a price ceiling — anything, as long as it names a number
      or an observable outcome. -->
 
-
+Given 5 queries that describe a real listing but in different words than that listing's title, description, or tags use (e.g. "jean jacket" for a listing tagged "denim"), `search_listings` still returns at least one result in 4 of 5 tries.
 
 **Why this target:**
 
-
+`_score()` in `tools.py` only counts exact word overlap between the query and a listing's title, description, category, colors, style_tags, and brand — there's no synonym or fuzzy matching. A rephrasing that shares zero literal words with the listing's own text scores 0 and gets dropped, even if a person would recognize it as the same item, so I'm allowing one of five rephrasings to miss.
 
 ---
 
