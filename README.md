@@ -113,8 +113,15 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Pair the butterfly baby tee with your baggy straight-leg jeans, black combat boots, and the slightly cropped vintage black denim jacket for an effortless Y2K streetwear look. Alternatively, tuck it into your wide-leg khaki trousers with chunky white sneakers and the black crossbody bag for a casual, 90s-inspired contrast.
+
+  Fit card: Obsessed with this Y2K butterfly baby tee, especially since it's in mint condition and only $18. I just listed it on depop so you can channel your inner 2000s pop star with zero effort. Snag it before I change my mind and keep it for myself!
+
+2 model calls this session, 538 prompt + 130 output tokens
 ```
 
 **The three tools, tested one at a time**
@@ -122,17 +129,39 @@ $ python app.py ask '...'
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
 
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'price': 18.0, ...},
+ {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'price': 24.0, ...},
+ {'id': 'lst_017', 'title': 'Mesh Long-Sleeve Top — Black', 'price': 15.0, ...},
+ {'id': 'lst_033', 'title': 'Vintage Band Tee — Faded Grey', 'price': 19.0, ...},
+ {'id': 'lst_011', 'title': 'Low-Rise Cargo Pants — Khaki', 'price': 27.0, ...},
+ {'id': 'lst_015', 'title': 'Vintage Graphic Hoodie — Faded Black', 'price': 26.0, ...}]
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
 
+Pair the vintage Levi's with your fitted white ribbed tank top and chunky white sneakers for an effortless, classic streetwear look. Throw on your slightly cropped vintage black denim jacket and accessorize with the black crossbody bag to complete the outfit.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+
+Found these broken-in vintage Levi's 501s thrifting for just $38.00 and I'm never taking them off. That perfect medium wash has that exact 90s slouch you can't fake. Throw them on with crisp white sneakers and a beat-up tee for the ultimate effortless weekend uniform, now up on my depop.
+```
+
+**Checking `create_fit_card` isn't returning the same words every time** — ran it three times on the same item with the cache off (`AI201_CACHE=0`), since a cache hit and `TEMPERATURE=0` are the two things that would make three runs identical, and this project's `TEMPERATURE` is 0.9:
 
 ```
+$ AI201_CACHE=0 python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+
+run 1: Nothing beats the wash on these vintage Levi's 501 jeans, especially when they're broken in just right. Pair them with crisp white sneakers for that effortlessly cool 90s off-duty model vibe. Snagged them for $38.0 on depop before anyone else could.
+
+run 2: The absolute holy grail of denim just landed in my Depop shop. These vintage Levi's 501s feature that perfect broken-in medium wash you can't fake. Grab them for $38 and pair them with crisp white sneakers for an effortless off-duty model vibe.
+
+run 3: The hunt is officially over because I just scored these broken-in vintage Levi's 501 jeans for only $38. They've got that perfect relaxed 90s slouch that you just can't fake. Throw them on with crisp white sneakers and an oversized tee for the ultimate effortlessly cool fit. Now live on my Depop—grab 'em before I change my mind and keep them.
+```
+
+Three different captions confirms the variation comes from `TEMPERATURE`, not a bug — and that the cache (on by default) is why identical back-to-back calls in the same process looked identical at first.
 
 ---
 
