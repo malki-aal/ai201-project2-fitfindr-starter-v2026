@@ -39,8 +39,13 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+A user types a plain-language query like `"vintage graphic tee under $30"` — a
+description, optionally a size and a price ceiling. FitFindr searches the
+listings data for the best match, suggests one or two outfits that pair it
+with pieces from the user's wardrobe (or general styling advice if they don't
+have one saved), and writes a short social-media caption for the find. If
+nothing in the data matches the query, it stops and says what to change
+instead of making something up.
 
 
 ---
@@ -176,15 +181,15 @@ Three different captions confirms the variation comes from `TEMPERATURE`, not a 
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* My `git push` was rejected with a GitHub secret-scanning error, and I asked Claude why.
+- *What came back:* It found that I'd pasted my real `GEMINI_API_KEY` into `.env.example` (which is tracked by git) instead of `.env` (which is gitignored). It also pointed out that just committing a fix on top wouldn't work, because GitHub's push protection scans every commit in the push, not just the final diff — the real key was still sitting in the one unpushed commit's history.
+- *What I changed:* I put the placeholder back in `.env.example`, and instead of adding a new commit, amended the one unpushed commit so the key never existed in any commit that reached GitHub. I also rotated the key afterward since it had already been written to disk and shown in my terminal.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* For criteria.md, I asked Claude to just write my three remaining acceptance criteria and the "why this target" reasoning for me.
+- *What came back:* It refused — pointed out the assignment explicitly says not to have a model write the criteria, since the reasoning only means something if I can defend it myself. It offered guided questions and fill-in-the-blank templates instead, and when I pushed back, it gave me multiple-choice reasoning options to pick from for each "why" line rather than writing the reasoning itself.
+- *What I changed:* I picked the reasoning that actually matched my code (e.g. for the state criterion, that `selected_item` is a plain dict passed straight through the session with no model call involved, so there's no reason to accept less than 5 of 5), and wrote the final targets and numbers in my own words from there.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
