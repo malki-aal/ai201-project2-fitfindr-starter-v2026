@@ -273,19 +273,52 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: matched — continuing to suggest_outfit
+[3] suggest_outfit
+      in:  dict with keys: item
+      out: Pair the butterfly baby tee with your baggy straight-leg jeans, black combat boots, and the slightly cropped v…
+[4] create_fit_card
+      in:  dict with keys: outfit
+      out: Obsessed with this Y2K butterfly baby tee, especially since it's in mint condition and only $18. I just listed…
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Pair the butterfly baby tee with your baggy straight-leg jeans, black combat boots, and the slightly cropped vintage black denim jacket for an effortless Y2K streetwear look. Alternatively, tuck it into your wide-leg khaki trousers with chunky white sneakers and the black crossbody bag for a casual, 90s-inspired contrast.
+
+  Fit card: Obsessed with this Y2K butterfly baby tee, especially since it's in mint condition and only $18. I just listed it on depop so you can channel your inner 2000s pop star with zero effort. Snag it before I change my mind and keep it for myself!
+
+0 model calls this session, 2 served from cache
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
 
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+      →    branch: empty — stopping before suggest_outfit
+
+  No listings matched. Try a broader description, a higher max_price, or dropping the size filter.
+
+0 model calls this session
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+The empty-search trace is two steps; the happy path is four. The branch is doing its job — it stops the loop before `suggest_outfit` or `create_fit_card` ever run, rather than calling them with nothing to work with.
+
+**On the MCP move:** Moved `search_listings` to `mcp_server.py`, registered with `@mcp.tool()`. In `agent.py::run_agent`, the direct call `search_listings(description, size, max_price)` became `call_tool("search_listings", {...})` from `mcp_client`. The rewire worked on the first attempt — the only snag was environmental, not architectural: `mcp` wasn't on `PATH` for the global `python`, because the project uses a `.venv` with its own installed packages, so I had to run everything through `.venv/Scripts/python.exe` instead. Once that was sorted, the output was byte-for-byte the same as the direct call — same item found, same price as a real `float`, same list shape — confirming the MCP wrapper changed nothing about what the tool actually returns.
 
 
 
