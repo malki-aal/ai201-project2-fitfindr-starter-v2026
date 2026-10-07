@@ -191,6 +191,18 @@ Three different captions confirms the variation comes from `TEMPERATURE`, not a 
 - *What came back:* It refused — pointed out the assignment explicitly says not to have a model write the criteria, since the reasoning only means something if I can defend it myself. It offered guided questions and fill-in-the-blank templates instead, and when I pushed back, it gave me multiple-choice reasoning options to pick from for each "why" line rather than writing the reasoning itself.
 - *What I changed:* I picked the reasoning that actually matched my code (e.g. for the state criterion, that `selected_item` is a plain dict passed straight through the session with no model call involved, so there's no reason to accept less than 5 of 5), and wrote the final targets and numbers in my own words from there.
 
+**Moment 3 (unit 4)**
+
+- *What I asked for:* I asked Claude to build the scenarios for criterion 5 (rephrased queries that don't share the target listing's own words).
+- *What came back:* Its first candidates — things like `"boxy jean coat"` — accidentally scored non-zero anyway, because common words like "boxy" happened to appear elsewhere in the 40-listing dataset by coincidence, not because the rephrasing actually worked. Rather than trust that, it built the full vocabulary set across all 40 listings' searchable fields, checked which words genuinely appear nowhere in the data, and used those to construct real zero-overlap test cases (`"trench coat"`, `"pleated slacks"`).
+- *What I changed:* I kept its empirically-verified queries instead of a first guess, which is why criterion 5's "before" miss (3/5) is a real measurement of `_score()`'s weakness rather than an artifact of a badly-chosen test query.
+
+**Moment 4 (unit 4)**
+
+- *What I asked for:* Nothing directly — I told Claude to never echo my full API key value in chat again, after it had printed the real key (and the broken test version) in plain text multiple times while helping me diagnose the push-protection failure and the later key rotation.
+- *What came back:* It agreed and switched its own verification method — instead of `cat`/`grep`-ing the raw value, it started checking and reporting only the key's length and a masked prefix/suffix (e.g. "present, length=53, starts with 'AQ.A', ends with '8A'") to confirm the right value was in the right file without displaying it.
+- *What I changed:* Nothing in my code — this was purely a correction to how Claude handled a secret in our conversation going forward, not a code fix.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
