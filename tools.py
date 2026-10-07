@@ -35,6 +35,25 @@ _SIZE_TOKEN_RE = re.compile(r"[A-Za-z]+|\d+(?:\.\d+)?")
 # Plain words, for scoring a listing against the query's keywords.
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
+# Milestone 5 fix (unit 4): _score() below was exact, unstemmed word-overlap
+# with no synonym handling — diagnosed against criterion 5, which missed on
+# "trench coat" and "pleated slacks" because neither word appears literally
+# anywhere in the data, even though related items exist. This is a small,
+# one-directional synonym expansion applied to the QUERY only: common
+# alternate words for what's actually in the data's own vocabulary (checked
+# against data/listings.json), not a general thesaurus.
+_SYNONYMS: dict[str, set[str]] = {
+    "slacks": {"trousers", "pants"},
+    "trousers": {"pants"},
+    "coat": {"jacket"},
+    "sneakers": {"shoes"},
+    "sweater": {"knit", "knitwear", "cardigan"},
+    "jumper": {"sweater", "knit", "knitwear"},
+    "gown": {"dress"},
+    "tee": {"shirt"},
+    "jean": {"jeans", "denim"},
+}
+
 
 def _size_tokens(text: str) -> set[str]:
     return {t.lower() for t in _SIZE_TOKEN_RE.findall(text)}
@@ -58,6 +77,8 @@ def _score(listing: dict, description: str) -> int:
     query_words = _keywords(description)
     if not query_words:
         return 0
+    for word in list(query_words):
+        query_words |= _SYNONYMS.get(word, set())
     haystack = " ".join(
         [
             listing.get("title", ""),

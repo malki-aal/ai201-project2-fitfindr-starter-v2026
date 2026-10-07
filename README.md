@@ -414,36 +414,85 @@ The empty-search trace is two steps; the happy path is four. The branch is doing
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** Added a small, one-directional synonym table (`_SYNONYMS` in
+`tools.py`) and expanded the query's keyword set with it before scoring in
+`_score()` — e.g. a query containing "slacks" now also counts as containing
+"trousers"/"pants", "coat" also counts as "jacket", "gown" also counts as
+"dress". One function changed (`_score`), one new constant. Nothing about
+`search_listings`'s inputs, outputs, or the empty-list guarantee changed.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** Criterion 5's diagnosis (previous
+section) — `_score()` does exact, unstemmed word overlap with no synonym
+handling, so a real rephrasing like "pleated slacks" scored 0 against a
+listing titled "Straight Leg Khaki Trousers" even though it's clearly the
+same kind of item. The synonym table is a direct, scoped answer to that exact
+mechanism, not a rewrite of the scoring approach.
 
 ### Run Log — After
 
+`python run_eval.py --label after` — same 10 scenarios, 5 tries each, caching
+off. Full output: `results/run_2026-10-07_1847_after.md`.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. `selected_item`'s id matches what `suggest_outfit` received | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card mentions the price | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Rephrased query still returns a result | 4 of 5 | PASS | PASS | PASS | PASS | PASS | **MET (5/5)** |
 
-**Did it help, and how do I know:**
+> Row 5's "Try" columns are the same five rephrased-query scenarios as the
+> before table, in the same order (`trench coat`, `pleated slacks`, `block
+> heel booties`, `evening gown midi`, `chunky jumper vest`) — not five repeats
+> of one query, for the same reason as before: no model, no randomness.
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+**Did it help, and how do I know:** Yes, for the criterion it targeted —
+criterion 5 went from 3/5 to 5/5, and I can point at exactly why: `pleated
+slacks` now matches "Straight Leg Khaki Trousers — Olive" via the
+`slacks → trousers` synonym, and `trench coat` now matches jacket listings via
+`coat → jacket`. That second one is a real trade-off worth naming honestly:
+it fixes *recall* (the criterion only asks whether something comes back) but
+it isn't a precise match — a trench coat and a track jacket aren't the same
+garment, and the synonym table can't tell the difference. The fix is
+correctly scoped (it widens recall exactly where the diagnosis said to, and
+nowhere else) but it trades a little precision for that recall, which the
+current criterion doesn't measure and so didn't catch.
 
-
+Criterion 1 also went from 4/5 to 5/5 in this run, but **not because of this
+fix** — this run simply didn't hit the Gemini `503` outage that caused
+criterion 1's one miss in the before run. `search_listings` isn't involved in
+that criterion's failure mode at all, so crediting the synonym change for it
+would be the wrong diagnosis. Criteria 2, 3, and 4 are unchanged, as expected
+— the fix never touches the branch, the session, or either prompt.
 
 ---
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No criterion is currently below its target, but the fix itself is incomplete
+in a way worth naming rather than hiding:
 
-
+- **The synonym table is hand-picked and tiny** (9 entries), built by looking
+  at the two queries that actually failed rather than any general vocabulary
+  coverage. It'll keep missing any rephrasing whose alternate word isn't one
+  of the ones I happened to add — this patches the two cases the test
+  surfaced, it doesn't fix the underlying architecture (exact keyword
+  matching will always have a vocabulary ceiling; an embeddings-based or
+  fuzzy-match approach would generalize further, but that's a bigger change
+  than one unit's "pick one thing" scope allows).
+- **Recall went up, precision wasn't measured.** The `coat → jacket` synonym
+  means "trench coat" now matches jacket listings that aren't really trench
+  coats. Criterion 5 only checks "did something come back," so this passes
+  cleanly — but a criterion that also checked relevance (e.g., "the top
+  result shares at least one tag with the query's intent") would likely still
+  catch this as a problem. I didn't write that criterion this unit, so it's
+  not caught, and I'm flagging it here instead of pretending the fix is
+  clean.
+- I stopped at one change, as the milestone asked — I didn't also revisit
+  criterion 1's actual failure mode (the `503` outage), since that's a
+  transient upstream issue, not something `agent.py`'s existing
+  `ModelUnavailable` handling got wrong; it already degraded correctly when
+  it happened.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
