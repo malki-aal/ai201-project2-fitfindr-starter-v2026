@@ -321,14 +321,22 @@ $ python -c "from agent import _parse_query; from tools import search_listings; 
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | **MET (4/5)** | Counted PASS across the 5 tries in `results/run_2026-10-07_1834_before.md` — 4 ran to a finished fit card, 1 stopped early. |
+| 2 | Impossible query stops before `suggest_outfit` | 5 of 5 | **MET (5/5)** | All 5 tries stopped with the branch message before `suggest_outfit` ran — read the trace for each, not just the final message. |
+| 3 | `selected_item`'s id matches what `suggest_outfit` received | 5 of 5 | **MET (5/5)** | All 5 tries carried the same item through the session; independently confirmed with an instrumented spy on `suggest_outfit` (Milestone 5) that captured the literal id it received and compared it to `session["selected_item"]["id"]`. |
+| 4 | Fit card mentions the price | 4 of 5 | **MET (5/5)** | Read all 5 fit cards from the "same item, 5 tries" scenario — every one states the $38 price explicitly (as `$38`, `$38.0`, or `$38.00`). |
+| 5 | Rephrased query still returns a result | 4 of 5 | **MISSED (3/5)** | Of the 5 differently-worded queries, `trench coat` and `pleated slacks` returned `[]`; the other 3 returned at least one listing. 3 PASS out of 5 is below the 4-of-5 target — a miss, not a near-miss I can round up. |
 
 **Diagnoses**
 
+**Criterion 5 is the one miss, and it's in the tool, not the loop or the session.** `_score()` in `tools.py` ranks a listing by exact, unstemmed word-token overlap between the query and the listing's title, description, category, brand, colors, and style tags — there is no synonym table and no stemming. I checked: neither "trench," "coat," "pleated," nor "slacks" appears as a literal token anywhere in `data/listings.json`'s 40 records (built the full vocabulary set across all six fields and checked membership directly). The listing a person would call "khaki slacks" is titled "Straight Leg Khaki Trousers" in the data — a word a real shopper would use scores zero because it's the wrong word, not because nothing relevant exists. The tool is doing exactly what it was built to do; the design (plain keyword overlap) just doesn't generalize past the data's own vocabulary. This is the only miss, so there's no cross-tool pattern to report — but it's notable that the four criteria that held (branching, state, an explicitly-instructed model behavior) all test mechanical or heavily-constrained paths, while the one that missed tests the system's least-constrained capability: open-vocabulary matching with no model or synonym handling in the loop.
+
+**One thing worth flagging even though it isn't a miss:** criterion 1's "why this target" reasoning (written in `criteria.md` before any results existed) predicted the 1-in-5 miss would come from the search being "a plain keyword match" that some phrasings would miss. That's not what actually happened — criterion 1's one failed try had `search_listings` succeed with 10 results; the run stopped later, inside `suggest_outfit`, when the Gemini API returned a genuine `503 UNAVAILABLE` ("currently experiencing high demand"). The target (4 of 5) still held, but the mechanism I'd predicted wasn't the mechanism that actually fired — a reminder that "why I expect to miss sometimes" and "why I actually missed" can be two different tools entirely, and it's worth re-checking both every time rather than assuming the original guess was right.
+
+**Talk this through, on my own — arguing the opposite verdict for criterion 5:**
+The strongest case I can make for MET instead of MISSED: the criterion's wording only asks whether `search_listings` "returns at least one result" — it never requires the result to be the *correct* item. By that narrow reading, 3 of 5 rephrasings did return something, and for an unaided keyword matcher (no embeddings, no synonym table) built in a few hours, a 60% hit rate on genuinely different vocabulary isn't an unreasonable showing — maybe the real problem is that 4-of-5 was an optimistic target for this architecture, not that the system is broken.
+
+That argument doesn't survive, though — and this milestone says explicitly why: "the target was too ambitious" is the one reason that is *not* allowed to turn a miss into a revision. The criterion was fully measurable (a clean, repeatable 3-of-5 count, no ambiguity about what counts as a result), so it doesn't qualify as "broken" under the unit's own rule — it qualifies as missed. The honest move is to leave the target at 4 of 5, log this as a real miss, and attempt an actual fix in Milestone 5 (the criteria.md target itself stays untouched, with the original line intact).
 
 
 ---
