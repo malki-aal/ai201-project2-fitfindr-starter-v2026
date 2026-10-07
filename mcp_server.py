@@ -16,6 +16,7 @@ slow and nothing changes between runs while you're learning the shape.
 ─────────────────────────────────────────────────────────────────────────────
 TODO — register one tool.
 
+
 Uncomment the block below and fill it in. Three things matter:
 
   1. **The name.** Exactly what your agent will ask for.
@@ -67,24 +68,38 @@ from tools import search_listings as _search_listings_impl  # noqa: F401 — you
 mcp = FastMCP("fitfindr", log_level="WARNING")
 
 
-# ── TODO: uncomment and fill this in ──────────────────────────────────────────
-#
-# @mcp.tool()
-# def search_listings(
-#     description: str,
-#     size: str | None = None,
-#     max_price: float | None = None,
-# ) -> list[dict]:
-#     """
-#     <-- YOUR DESCRIPTION GOES HERE.
-#
-#         One or two sentences. What does this tool do, what does it need, and
-#         what does it give back when it finds nothing? Written for a reader
-#         who cannot see the code.
-#     """
-#     return _search_listings_impl(description, size, max_price)
-#
-# ──────────────────────────────────────────────────────────────────────────────
+@mcp.tool()
+def search_listings(
+    description: str,
+    size: str | None = None,
+    max_price: float | None = None,
+) -> list[dict]:
+    """
+    Search secondhand clothing listings by free-text description, optionally
+    narrowed by a size and a price ceiling.
+
+    Args:
+        description: Keywords describing the item wanted, e.g. "vintage
+            graphic tee". Matched against each listing's title, description,
+            category, brand, colors, and style tags; results are ranked by
+            how many of these keywords they share with the listing.
+        size: A size label, e.g. "M", "W30", or "8". Matched case-insensitively
+            against whole tokens in the listing's size field — "M" matches a
+            listing sized "S/M", but "L" does not match "XL". Omit to skip
+            size filtering.
+        max_price: Maximum price, in whole US dollars, inclusive. Omit to
+            skip price filtering.
+
+    Returns:
+        A list of matching listing dicts, best match first, each with: id,
+        title, description, category, style_tags (list of str), size,
+        condition, price (float, USD), colors (list of str), brand (string
+        or null), platform. Capped at 10 results.
+
+        Returns an empty list if nothing matches — never null, never an
+        error.
+    """
+    return _search_listings_impl(description, size, max_price)
 #
 # Two notes on the block above.
 #

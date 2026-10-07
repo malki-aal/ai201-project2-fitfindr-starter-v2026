@@ -17,7 +17,8 @@ import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from mcp_client import call_tool
+from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
 
 # "under $30", "below 30", "less than $30.50"
@@ -141,11 +142,11 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     session["parsed"] = _parse_query(query)
 
-    session["search_results"] = search_listings(
-        description=session["parsed"]["description"],
-        size=session["parsed"]["size"],
-        max_price=session["parsed"]["max_price"],
-    )
+    session["search_results"] = call_tool("search_listings", {
+        "description": session["parsed"]["description"],
+        "size": session["parsed"]["size"],
+        "max_price": session["parsed"]["max_price"],
+    })
 
     # ⚠️ THE BRANCH: nothing found means we stop here rather than hand
     # suggest_outfit an item that doesn't exist.
