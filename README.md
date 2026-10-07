@@ -209,19 +209,94 @@ Three different captions confirms the variation comes from `TEMPERATURE`, not a 
      `python run_eval.py --label before` runs everything and writes the table
      into results/. Paste it here and fill in the verdicts. -->
 
+`python run_eval.py --label before` — 10 scenarios × 5 tries, caching off. Full
+output: `results/run_2026-10-07_1834_before.md`.
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools, returns a fit card | 4 of 5 | PASS | PASS | PASS | PASS | FAIL | MET (4/5) |
+| 2. Impossible query stops before `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. `selected_item`'s id matches what `suggest_outfit` received | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card mentions the item's price (same item, 5 tries) | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Rephrased query still returns a result (5 *different* rephrasings — see note) | 4 of 5 | FAIL | FAIL | PASS | PASS | PASS | MISSED (3/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+> **Note on row 5:** unlike the other rows, each "Try" here is a *different*
+> query, not a repeated run of the same one — `search_listings` has no model
+> call and no randomness, so running one query 5 times would just give the
+> same answer 5 times. Try 1–5 above correspond to scenarios "rephrase 1"
+> through "rephrase 5" in `scenarios.py`, in order: `trench coat` (FAIL),
+> `pleated slacks` (FAIL), `block heel booties` (PASS), `evening gown midi`
+> (PASS), `chunky jumper vest` (PASS).
+
+Try 5 of criterion 1 and tries 4–5 of the (diagnostic, non-criterion) empty-wardrobe
+scenario failed for a reason outside my code: the Gemini API itself returned
+`503 UNAVAILABLE` ("currently experiencing high demand") during this run — a
+real, unplanned trigger of the same `ModelUnavailable` path I tested on purpose
+in Milestone 2, not a bug in the agent.
+
+**Real output, one per criterion, as text — file and function named:**
+
+**Criterion 1** — `tools.py::search_listings` finds it, `agent.py::run_agent`
+completes the run, `tools.py::create_fit_card` writes the card (Try 1):
 
 ```
+Query: vintage graphic tee under $30
 
+Outfit suggestion:
+Pair the Y2K baby tee with your baggy straight-leg jeans and chunky white sneakers for an effortless streetwear look, throwing on the black cropped zip hoodie just in case. Alternatively, tuck the baby tee into your wide-leg khaki trousers, add the brown leather belt, and finish with the black combat boots for a cool, mixed-aesthetic outfit.
+
+Fit card:
+Found this pristine Y2K baby tee with the cutest butterfly print hiding on Depop for just $18. The condition is unreal, and it's giving major 2000s mall-rat energy in the best way possible. Snag it before I keep it for myself and live out my Lizzie McGuire dreams.
+```
+
+**Criterion 2** — `agent.py::run_agent`, the branch, stopping before
+`suggest_outfit` (Try 1):
+
+```
+Query: designer ballgown size XXS under $5
+
+[2] search_listings (via MCP)
+      out: [] (empty)
+      →    branch: empty — stopping before suggest_outfit
+
+session["error"]: No listings matched. Try a broader description, a higher max_price, or dropping the size filter.
+session["selected_item"]: None
+session["fit_card"]: None
+```
+
+**Criterion 3** — `agent.py::run_agent`, state passing through the session
+(Try 1 of the run_eval scenario, plus the independent instrumented check from
+Milestone 5 that actually captures what `suggest_outfit` received):
+
+```
+Query: vintage graphic tee under $30
+
+session["selected_item"]["id"] -> lst_002
+id captured inside a patched tools.suggest_outfit (Milestone 5 spy test) -> lst_002
+match: True
+```
+
+**Criterion 4** — `tools.py::create_fit_card`, same item, price mentioned
+(Try 3, picked because it's the one that spells out the price two different
+ways in one card):
+
+```
+Query: vintage levi 501 jeans medium wash
+Item: Vintage Levi's 501 Jeans — Medium Wash ($38.0, depop)
+
+Fit card:
+Found the holy grail of denim: these vintage Levi's 501 jeans in the absolute best medium wash. Snagged them for just $38.00 and they're ready for your rotation over on my Depop right now. Pair them with a cropped zip hoodie and chunky sneakers for that effortless 90s off-duty model vibe.
+```
+
+**Criterion 5** — `tools.py::search_listings`, the recall gap on rephrased
+queries (one PASS, one FAIL, real output from each):
+
+```
+$ python -c "from agent import _parse_query; from tools import search_listings; print(search_listings(**_parse_query('trench coat')))"
+[]   # FAIL — no literal word in 'trench coat' appears anywhere in the data
+
+$ python -c "from agent import _parse_query; from tools import search_listings; print(search_listings(**_parse_query('evening gown midi')))"
+[{'id': 'lst_013', 'title': '90s Silk Slip Dress — Floral, Midi Length', 'price': 30.0, ...}]   # PASS — 'midi' overlaps with the listing's own title
 ```
 
 ---
